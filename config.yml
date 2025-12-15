@@ -1,0 +1,28 @@
+# BFHddl Configuration Template
+# Kopier denne fil til projektets rodmappe som config.yml
+# og tilpas vaerdierne til dit miljoe.
+
+default:
+  # ODBC Data Source Name til Access-databasen
+  dsn: "dataportal_2024"
+
+  # Sti til parquet-filer med raadata
+  parquet_base_path: "V:/BFH/BYH/Datadrevet ledelse/3_BEREGNEDE_DATA_DATAPORTAL"
+
+  # Sti til output-mappe for genererede diagrammer
+  output_path: "output/"
+
+  # Standard output-format (png eller pdf)
+  default_format: "pdf"
+
+  # Standard dimensioner for diagrammer (inches)
+  default_width: 10
+  default_height: 6
+
+development:
+  # Udviklings-specifikke indstillinger
+  output_path: "dev_output/"
+
+production:
+  # Produktions-specifikke indstillinger
+  # Brug default-vaerdier
