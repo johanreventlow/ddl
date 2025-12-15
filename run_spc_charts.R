@@ -1,11 +1,16 @@
 # =============================================================================
 # SPC Chart Generation Script
 # Bruger BFHddl-pakken til at generere SPC-diagrammer
+#
+# Flowet:
+# 1. Henter diagrammer fra tblDiagrammer i MS Access
+# 2. For hvert diagram: indlaeser parquet data filtreret paa organisation
+# 3. Genererer SPC-chart via BFHcharts
+# 4. Gemmer fil: {indikator}_{organisation}_{dato}.{format}
 # =============================================================================
 
 # --- Setup -------------------------------------------------------------------
 
-# Installer BFHddl hvis ikke installeret
 if (!requireNamespace("BFHddl", quietly = TRUE)) {
   message("Installerer BFHddl...")
   remotes::install_github("johanreventlow/BFHddl")
@@ -15,88 +20,72 @@ library(BFHddl)
 
 # --- Konfiguration -----------------------------------------------------------
 
-# Kopier config-template hvis config.yml ikke findes
 if (!file.exists("config.yml")) {
   file.copy(
     system.file("config/config-template.yml", package = "BFHddl"),
     "config.yml"
   )
   message("config.yml oprettet - rediger den med dine stier og DSN")
-  stop("Rediger config.yml og kor scriptet igen")
+  stop("Rediger config.yml og koer scriptet igen")
 }
 
-# Valider konfiguration
 cfg <- get_config()
 validate_config(cfg, check_paths = FALSE)
 
-message("Konfiguration indlaest:")
+message("Konfiguration:")
 message("  DSN: ", cfg$dsn)
-message("  Parquet-sti: ", cfg$parquet_base_path)
-message("  Output-sti: ", cfg$output_path)
+message("  Parquet: ", cfg$parquet_base_path)
+message("  Output: ", cfg$output_path)
 
-# --- Database forbindelse ----------------------------------------------------
+# --- Dry run - se hvad der ville blive genereret -----------------------------
 
-message("\nOpretter database-forbindelse...")
-con <- db_connect(dsn = cfg$dsn)
-
-# Hent datamodel
-dm <- db_get_datamodel(con)
-
-# --- Se tilgaengelige indikatorer --------------------------------------------
-
-message("\nHenter indikatorer...")
-indikatorer <- db_get_indicators(dm, active_only = TRUE)
-
-message("Fandt ", nrow(indikatorer), " aktive indikatorer:")
-# Vis tilgaengelige kolonner
-message("Kolonner: ", paste(names(indikatorer), collapse = ", "))
-# Vis relevante kolonner (brug indikator_navn i stedet for indikator_navn_langt)
-print(indikatorer[, c("id", "indikator_navn_teknisk", "indikator_navn")])
-
-# --- Generer diagrammer ------------------------------------------------------
-
-# Option 1: Koer fuld pipeline for alle indikatorer
-# result <- run_pipeline()
-
-# Option 2: Koer for specifikke indikatorer
-# result <- run_pipeline(
-#   indicators = c("indikator_navn_1", "indikator_navn_2"),
-#   format = "png"
-# )
-
-# Option 3: Dry run - se hvad der ville blive genereret
 message("\n--- Dry Run ---")
-plan <- run_pipeline(dry_run = TRUE, verbose = TRUE)
+plan <- run_pipeline(dry_run = TRUE)
 
-message("\nDry run resultat:")
-message("  Indikatorer: ", length(plan$indicators_to_process))
+message("\nPlan:")
+message("  Diagrammer: ", plan$diagrams_to_process)
+message("  Unikke indikatorer: ", length(plan$indicators))
+message("  Unikke organisationer: ", length(plan$organisations))
 message("  Estimerede filer: ", plan$estimated_files)
 
-# --- Afslut ------------------------------------------------------------------
+# --- Koer pipeline -----------------------------------------------------------
 
-db_disconnect(con)
-message("\nFaerdig!")
+# Uncomment en af disse for at koere:
 
-# =============================================================================
-# Eksempler paa brug
-# =============================================================================
-#
-# # Generer alle diagrammer som PNG
+# Normal koersel:
 # result <- run_pipeline(format = "png")
-#
-# # Generer kun for specifikke indikatorer
-# result <- run_pipeline(
-#   indicators = c("ventetid_akut", "genindlaeggelser"),
-#   format = c("png", "pdf")
-# )
-#
-# # Generer med dato-filter
-# result <- run_pipeline(
-#   from_date = "2024-01-01",
-#   to_date = "2024-12-31"
-# )
-#
-# # Se status for seneste koersel
+
+# Debug mode - trin for trin:
+result <- run_pipeline(debug = TRUE, format = "pdf")
+
+# Med dato-filter:
+# result <- run_pipeline(from_date = "2024-01-01", format = "png")
+
+# Flere formater:
+# result <- run_pipeline(format = c("png", "pdf"))
+
+# --- Se status ---------------------------------------------------------------
+
 # pipeline_status()
+
+# =============================================================================
+# API Reference
+# =============================================================================
+#
+# run_pipeline(
+#   output_dir = NULL,      # Mappe til output (fra config hvis NULL)
+#   format = "png",         # "png", "pdf", eller c("png", "pdf")
+#   from_date = NULL,       # Filtrer data fra denne dato
+#   to_date = NULL,         # Filtrer data til denne dato
+#   width = 10,             # Diagram bredde (inches)
+#   height = 6,             # Diagram hoejde (inches)
+#   dpi = 300,              # Oploesning for PNG
+#   verbose = TRUE,         # Vis progress
+#   dry_run = FALSE,        # Kun vis plan, generer ikke
+#   debug = FALSE,          # Hold pause efter hvert trin
+#   config_file = "config.yml"
+# )
+#
+# pipeline_status()         # Vis seneste koersel fra log
 #
 # =============================================================================
