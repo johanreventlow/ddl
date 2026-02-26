@@ -56,7 +56,7 @@ message("  Estimerede filer: ", plan$estimated_files)
 # result <- run_pipeline(format = "png")
 
 # Debug mode - trin for trin:
-result <- run_pipeline(debug = TRUE, format = "pdf")
+result <- run_pipeline(debug = FALSE, format = "pdf")
 
 # Med dato-filter:
 # result <- run_pipeline(from_date = "2024-01-01", format = "png")
