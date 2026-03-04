@@ -11,12 +11,98 @@
 
 # --- Setup -------------------------------------------------------------------
 
-if (!requireNamespace("BFHddl", quietly = TRUE)) {
-  message("Installerer BFHddl...")
-  remotes::install_github("johanreventlow/BFHddl")
+# Udviklings-mode: load fra lokal kilde uden at kompilere/installere
+BFHDDL_DEV_PATH <- "c:/Users/jrev0004/OneDrive - Region Hovedstaden/4_R/BFHddl"
+
+if (dir.exists(BFHDDL_DEV_PATH)) {
+  devtools::load_all(BFHDDL_DEV_PATH)
+} else {
+  # Fallback: brug installeret pakke
+  # if (!requireNamespace("BFHddl", quietly = TRUE)) {
+  #   message("Installerer BFHddl...")
+  #   remotes::install_github("johanreventlow/BFHddl")
+  # }
+  library(BFHddl)
 }
 
-library(BFHddl)
+# --- Interaktiv diagram-udvaelgelse -----------------------------------------
+
+select_diagrams <- function(config_file = "config.yml") {
+  # Forbind til database og hent data
+  cfg <- get_config(config_file)
+  con <- db_connect(cfg$dsn)
+  on.exit(db_disconnect(con), add = TRUE)
+
+  dm <- db_get_datamodel(con)
+  diagram_data <- db_get_diagrams(dm, active_only = TRUE)
+  indicator_data <- db_get_indicators(dm, active_only = FALSE,
+    indicators = unique(diagram_data$indikator_navn_teknisk))
+
+  # Join hierarki_navn paa diagram_data
+  diagram_data <- merge(
+    diagram_data,
+    indicator_data[, c("indikator_navn_teknisk", "hierarki_navn")],
+    by = "indikator_navn_teknisk",
+    all.x = TRUE
+  )
+
+  # --- Step 1: Vaelg hierarki (register) ---
+  hierarkier <- sort(unique(diagram_data$hierarki_navn))
+  valgte_hierarkier <- select.list(
+    choices = c("ALLE", hierarkier),
+    multiple = TRUE,
+    graphics = TRUE,
+    title = "Vaelg register (hierarki):"
+  )
+
+  if (length(valgte_hierarkier) == 0) {
+    message("Ingen valg - afbryder")
+    return(NULL)
+  }
+
+  if (!"ALLE" %in% valgte_hierarkier) {
+    diagram_data <- diagram_data[diagram_data$hierarki_navn %in% valgte_hierarkier, ]
+  }
+
+  # --- Step 2: Vaelg indikatorer ---
+  indikatorer <- sort(unique(diagram_data$indikator_navn_teknisk))
+  valgte_indikatorer <- select.list(
+    choices = c("ALLE", indikatorer),
+    multiple = TRUE,
+    graphics = TRUE,
+    title = "Vaelg indikatorer:"
+  )
+
+  if (length(valgte_indikatorer) == 0) {
+    message("Ingen valg - afbryder")
+    return(NULL)
+  }
+
+  if (!"ALLE" %in% valgte_indikatorer) {
+    diagram_data <- diagram_data[diagram_data$indikator_navn_teknisk %in% valgte_indikatorer, ]
+  }
+
+  # --- Step 3: Vaelg organisationer ---
+  organisationer <- sort(unique(diagram_data$organisatorisk_navn_teknisk))
+  valgte_orgs <- select.list(
+    choices = c("ALLE", organisationer),
+    multiple = TRUE,
+    graphics = TRUE,
+    title = "Vaelg organisationer:"
+  )
+
+  if (length(valgte_orgs) == 0) {
+    message("Ingen valg - afbryder")
+    return(NULL)
+  }
+
+  if (!"ALLE" %in% valgte_orgs) {
+    diagram_data <- diagram_data[diagram_data$organisatorisk_navn_teknisk %in% valgte_orgs, ]
+  }
+
+  message(sprintf("Valgt: %d diagrammer", nrow(diagram_data)))
+  return(diagram_data)
+}
 
 # --- Konfiguration -----------------------------------------------------------
 
@@ -37,32 +123,15 @@ message("  DSN: ", cfg$dsn)
 message("  Parquet: ", cfg$parquet_base_path)
 message("  Output: ", cfg$output_path)
 
-# --- Dry run - se hvad der ville blive genereret -----------------------------
+# --- Interaktiv udvaelgelse + koersel ----------------------------------------
 
-message("\n--- Dry Run ---")
-plan <- run_pipeline(dry_run = TRUE)
+selected <- select_diagrams()
 
-message("\nPlan:")
-message("  Diagrammer: ", plan$diagrams_to_process)
-message("  Unikke indikatorer: ", length(plan$indicators))
-message("  Unikke organisationer: ", length(plan$organisations))
-message("  Estimerede filer: ", plan$estimated_files)
-
-# --- Koer pipeline -----------------------------------------------------------
-
-# Uncomment en af disse for at koere:
-
-# Normal koersel:
-# result <- run_pipeline(format = "png")
-
-# Debug mode - trin for trin:
-result <- run_pipeline(debug = FALSE, format = "pdf")
-
-# Med dato-filter:
-# result <- run_pipeline(from_date = "2024-01-01", format = "png")
-
-# Flere formater:
-# result <- run_pipeline(format = c("png", "pdf"))
+if (!is.null(selected) && nrow(selected) > 0) {
+  result <- run_pipeline(diagram_filter = selected, format = "pdf")
+} else {
+  message("Ingen diagrammer valgt - pipeline springes over")
+}
 
 # --- Se status ---------------------------------------------------------------
 
