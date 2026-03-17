@@ -10,14 +10,14 @@ default:
   parquet_base_path: "V:/BFH/BYH/Datadrevet ledelse/3_BEREGNEDE_DATA_DATAPORTAL"
 
   # Sti til output-mappe for genererede diagrammer
-  output_path: "output/"
+  output_path: "C:/Users/jrev0004/OneDrive - Region Hovedstaden/ddl_output"
 
   # Standard output-format (png eller pdf)
   default_format: "pdf"
 
-  # Standard dimensioner for diagrammer (inches)
-  default_width: 10
-  default_height: 6
+  # Standard dimensioner for diagrammer (millimeter)
+  default_width_mm: 254
+  default_height_mm: 152
 
 development:
   # Udviklings-specifikke indstillinger

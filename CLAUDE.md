@@ -52,7 +52,7 @@ config.yml → run_spc_charts.R → BFHddl pipeline → Output (PNG/PDF)
 - `parquet_base_path` - Sti til parquet-filer
 - `output_path` - Sti til genererede diagrammer
 - `default_format` - Output-format (png/pdf)
-- `default_width/height` - Diagramdimensioner
+- `default_width_mm/height_mm` - Diagramdimensioner (millimeter)
 
 ---
 
