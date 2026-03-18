@@ -14,7 +14,15 @@
 # Udviklings-mode: load fra lokal kilde uden at kompilere/installere
 DEV_BASE <- "c:/Users/jrev0004/OneDrive - Region Hovedstaden/4_R"
 
-# BFHcharts foerst (dependency for BFHddl)
+# BFHtheme foerst (dependency for BFHcharts)
+BFHTHEME_DEV_PATH <- file.path(DEV_BASE, "BFHtheme")
+if (dir.exists(BFHTHEME_DEV_PATH)) {
+  devtools::load_all(BFHTHEME_DEV_PATH)
+} else if (requireNamespace("BFHtheme", quietly = TRUE)) {
+  library(BFHtheme)
+}
+
+# BFHcharts (dependency for BFHddl)
 BFHCHARTS_DEV_PATH <- file.path(DEV_BASE, "BFHcharts")
 if (dir.exists(BFHCHARTS_DEV_PATH)) {
   devtools::load_all(BFHCHARTS_DEV_PATH)
