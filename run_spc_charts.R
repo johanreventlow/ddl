@@ -12,16 +12,29 @@
 # --- Setup -------------------------------------------------------------------
 
 # Udviklings-mode: load fra lokal kilde uden at kompilere/installere
-BFHDDL_DEV_PATH <- "c:/Users/jrev0004/OneDrive - Region Hovedstaden/4_R/BFHddl"
+DEV_BASE <- "c:/Users/jrev0004/OneDrive - Region Hovedstaden/4_R"
 
+# BFHcharts foerst (dependency for BFHddl)
+BFHCHARTS_DEV_PATH <- file.path(DEV_BASE, "BFHcharts")
+if (dir.exists(BFHCHARTS_DEV_PATH)) {
+  devtools::load_all(BFHCHARTS_DEV_PATH)
+} else {
+  library(BFHcharts)
+}
+
+# BFHllm (dependency for BFHddl batch-analyse)
+BFHLLM_DEV_PATH <- file.path(DEV_BASE, "BFHllm")
+if (dir.exists(BFHLLM_DEV_PATH)) {
+  devtools::load_all(BFHLLM_DEV_PATH)
+} else if (requireNamespace("BFHllm", quietly = TRUE)) {
+  library(BFHllm)
+}
+
+# BFHddl
+BFHDDL_DEV_PATH <- file.path(DEV_BASE, "BFHddl")
 if (dir.exists(BFHDDL_DEV_PATH)) {
   devtools::load_all(BFHDDL_DEV_PATH)
 } else {
-  # Fallback: brug installeret pakke
-  # if (!requireNamespace("BFHddl", quietly = TRUE)) {
-  #   message("Installerer BFHddl...")
-  #   remotes::install_github("johanreventlow/BFHddl")
-  # }
   library(BFHddl)
 }
 
@@ -128,7 +141,8 @@ message("  Output: ", cfg$output_path)
 selected <- select_diagrams()
 
 if (!is.null(selected) && nrow(selected) > 0) {
-  result <- run_pipeline(diagram_filter = selected, format = "pdf")
+  result <- run_pipeline(diagram_filter = selected, format = "pdf",
+                         force_refresh = TRUE)
 } else {
   message("Ingen diagrammer valgt - pipeline springes over")
 }
