@@ -150,7 +150,7 @@ selected <- select_diagrams()
 
 if (!is.null(selected) && nrow(selected) > 0) {
   result <- run_pipeline(diagram_filter = selected, format = "pdf",
-                         force_refresh = TRUE)
+                         force_refresh = TRUE, workers = 4L)
 } else {
   message("Ingen diagrammer valgt - pipeline springes over")
 }
