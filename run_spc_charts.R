@@ -12,6 +12,8 @@
 # --- Setup -------------------------------------------------------------------
 
 # Udviklings-mode: load fra lokal kilde uden at kompilere/installere
+# unlink("C:/Users/jrev0004/OneDrive - Region Hovedstaden/ddl_output/.bfhllm_cache", recursive = TRUE)
+
 DEV_BASE <- "c:/Users/jrev0004/OneDrive - Region Hovedstaden/4_R"
 
 # BFHtheme foerst (dependency for BFHcharts)
@@ -59,10 +61,32 @@ select_diagrams <- function(config_file = "config.yml") {
   indicator_data <- db_get_indicators(dm, active_only = FALSE,
     indicators = unique(diagram_data$indikator_navn_teknisk))
 
-  # Join hierarki_navn paa diagram_data
+  # Join hierarki_navn, hierarki_id og indikator_navn paa diagram_data
+  # Brug definition_kort som visningsnavn hvis indikator_navn ikke findes
+  ind_name_col <- if ("indikator_navn" %in% names(indicator_data)) {
+    "indikator_navn"
+  } else if ("definition_kort" %in% names(indicator_data)) {
+    "definition_kort"
+  } else {
+    NULL
+  }
+
+  join_cols <- intersect(
+    c("indikator_navn_teknisk", "hierarki_navn", "hierarki_id", ind_name_col),
+    names(indicator_data)
+  )
+  join_data <- indicator_data[!duplicated(indicator_data$indikator_navn_teknisk),
+    join_cols, drop = FALSE]
+
+  # Omdoeb til indikator_navn hvis vi brugte en anden kolonne
+  if (!is.null(ind_name_col) && ind_name_col != "indikator_navn" &&
+      ind_name_col %in% names(join_data)) {
+    names(join_data)[names(join_data) == ind_name_col] <- "indikator_navn"
+  }
+
   diagram_data <- merge(
     diagram_data,
-    indicator_data[, c("indikator_navn_teknisk", "hierarki_navn")],
+    join_data,
     by = "indikator_navn_teknisk",
     all.x = TRUE
   )
@@ -86,21 +110,71 @@ select_diagrams <- function(config_file = "config.yml") {
   }
 
   # --- Step 2: Vaelg indikatorer ---
-  indikatorer <- sort(unique(diagram_data$indikator_navn_teknisk))
-  valgte_indikatorer <- select.list(
-    choices = c("ALLE", indikatorer),
+  # Byg lookup-tabel: teknisk_navn -> visningsnavn
+  ind_tekniske <- sort(unique(diagram_data$indikator_navn_teknisk))
+
+  # Byg lookup fra teknisk -> visningsnavn med hierarki_kort, indikator_navn, teknisk
+  lookup_cols <- intersect(
+    c("indikator_navn_teknisk", "indikator_navn", "definition_kort",
+      "hierarki_navn_kort", "hierarki_navn"),
+    names(indicator_data)
+  )
+  ind_lookup <- indicator_data[!duplicated(indicator_data$indikator_navn_teknisk),
+    lookup_cols, drop = FALSE]
+
+  # Match til sorteret teknisk-liste
+  idx <- match(ind_tekniske, ind_lookup$indikator_navn_teknisk)
+
+  # Hierarki-kort (fallback til hierarki_navn)
+  h_kort <- if ("hierarki_navn_kort" %in% names(ind_lookup)) {
+    ifelse(!is.na(ind_lookup$hierarki_navn_kort[idx]) & nchar(ind_lookup$hierarki_navn_kort[idx]) > 0,
+      ind_lookup$hierarki_navn_kort[idx],
+      ind_lookup$hierarki_navn[idx])
+  } else if ("hierarki_navn" %in% names(ind_lookup)) {
+    ind_lookup$hierarki_navn[idx]
+  } else {
+    rep(NA_character_, length(idx))
+  }
+
+  # Indikator-navn (fallback til definition_kort)
+  i_navn <- if ("indikator_navn" %in% names(ind_lookup)) {
+    ind_lookup$indikator_navn[idx]
+  } else if ("definition_kort" %in% names(ind_lookup)) {
+    ind_lookup$definition_kort[idx]
+  } else {
+    rep(NA_character_, length(idx))
+  }
+
+  # Byg label: "hierarki_kort | indikator_navn (teknisk)"
+  ind_labels <- vapply(seq_along(ind_tekniske), function(j) {
+    parts <- character()
+    if (!is.na(h_kort[j])) parts <- c(parts, h_kort[j])
+    if (!is.na(i_navn[j])) parts <- c(parts, i_navn[j])
+    prefix <- paste(parts, collapse = " | ")
+    if (nchar(prefix) > 0) {
+      paste0(prefix, " (", ind_tekniske[j], ")")
+    } else {
+      ind_tekniske[j]
+    }
+  }, character(1))
+
+  # Vis labels, men brug tekniske navne til filtrering
+  valgte_labels <- select.list(
+    choices = c("ALLE", ind_labels),
     multiple = TRUE,
     graphics = TRUE,
     title = "Vaelg indikatorer:"
   )
 
-  if (length(valgte_indikatorer) == 0) {
+  if (length(valgte_labels) == 0) {
     message("Ingen valg - afbryder")
     return(NULL)
   }
 
-  if (!"ALLE" %in% valgte_indikatorer) {
-    diagram_data <- diagram_data[diagram_data$indikator_navn_teknisk %in% valgte_indikatorer, ]
+  if (!"ALLE" %in% valgte_labels) {
+    valgte_idx <- match(valgte_labels, ind_labels)
+    valgte_tekniske <- ind_tekniske[valgte_idx]
+    diagram_data <- diagram_data[diagram_data$indikator_navn_teknisk %in% valgte_tekniske, ]
   }
 
   # --- Step 3: Vaelg organisationer ---
